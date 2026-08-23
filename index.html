@@ -1,0 +1,1543 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NOVA — The Material Lab</title>
+    <style>
+        :root {
+            --bg: #050505;
+            --bg-elevated: #0a0a0a;
+            --text: #e8e6e3;
+            --text-dim: #8a8682;
+            --text-faint: #4a4642;
+            --accent: #c9b8a0;
+            --accent-dim: #8a7a65;
+            --border: rgba(200, 190, 175, 0.12);
+            --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            --font-mono: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace;
+            --ui-bg: rgba(10, 10, 10, 0.7);
+            --ui-hover: rgba(25, 25, 25, 0.85);
+            --ui-radius: 4px;
+            --transition: 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html {
+            scroll-behavior: auto;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: var(--font-sans);
+            overflow-x: hidden;
+            cursor: default;
+            -webkit-user-select: none;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+            height: 100%;
+            width: 100%;
+            position: fixed;
+            top: 0;
+            left: 0;
+            overflow: hidden;
+        }
+
+        body.allow-select {
+            -webkit-user-select: text;
+            user-select: text;
+        }
+
+        #scroll-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            overflow-y: auto;
+            overflow-x: hidden;
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+            z-index: 1;
+        }
+        #scroll-container::-webkit-scrollbar {
+            display: none;
+        }
+
+        #scroll-spacer {
+            height: 600vh;
+            width: 100%;
+            pointer-events: none;
+        }
+
+        #canvas-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+            pointer-events: none;
+            background: #050505;
+        }
+        #canvas-container canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+        #canvas-container.interactive {
+            pointer-events: auto;
+        }
+
+        #grain-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 4;
+            opacity: 0.04;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+            background-repeat: repeat;
+            background-size: 256px 256px;
+            mix-blend-mode: overlay;
+            animation: grain-shift 0.5s steps(4) infinite;
+        }
+        @keyframes grain-shift {
+            0% {
+                transform: translate(0, 0);
+            }
+            25% {
+                transform: translate(-5%, 3%);
+            }
+            50% {
+                transform: translate(3%, -5%);
+            }
+            75% {
+                transform: translate(-3%, -3%);
+            }
+            100% {
+                transform: translate(5%, 5%);
+            }
+        }
+
+        #vignette-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 3;
+            background: radial-gradient(ellipse at center, transparent 55%, rgba(0, 0, 0, 0.5) 100%);
+        }
+
+        #loading-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 100;
+            background: #050505;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            transition: opacity 1s cubic-bezier(0.22, 1, 0.36, 1);
+            pointer-events: all;
+        }
+        #loading-screen.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+        #loading-screen .logo-text {
+            font-size: clamp(2rem, 6vw, 4rem);
+            font-weight: 600;
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+            color: var(--text);
+            margin-bottom: 0.5rem;
+            animation: pulse-fade 2.4s ease-in-out infinite;
+        }
+        #loading-screen .sub-text {
+            font-family: var(--font-mono);
+            font-size: 0.65rem;
+            letter-spacing: 0.35em;
+            text-transform: uppercase;
+            color: var(--text-faint);
+            margin-bottom: 2.5rem;
+        }
+        @keyframes pulse-fade {
+            0%,
+            100% {
+                opacity: 1;
+            }
+            50% {
+                opacity: 0.5;
+            }
+        }
+
+        .progress-track {
+            width: min(280px, 60vw);
+            height: 1px;
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 1px;
+            overflow: hidden;
+            margin-bottom: 0.8rem;
+        }
+        .progress-fill {
+            height: 100%;
+            background: var(--accent);
+            width: 0%;
+            transition: width 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+            border-radius: 1px;
+        }
+        .progress-num {
+            font-family: var(--font-mono);
+            font-size: 0.7rem;
+            letter-spacing: 0.25em;
+            color: var(--text-dim);
+            transition: color 0.3s;
+        }
+
+        #main-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 5;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 2rem 2.5rem;
+            opacity: 0;
+            transition: opacity 1.5s cubic-bezier(0.22, 1, 0.36, 1);
+        }
+        #main-overlay.visible {
+            opacity: 1;
+        }
+
+        #top-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            pointer-events: none;
+        }
+        #top-bar .brand {
+            font-size: 0.7rem;
+            letter-spacing: 0.4em;
+            text-transform: uppercase;
+            color: var(--text-dim);
+            font-weight: 400;
+        }
+        #top-bar .brand span {
+            color: var(--accent);
+        }
+        #top-bar .scroll-hint {
+            font-family: var(--font-mono);
+            font-size: 0.6rem;
+            letter-spacing: 0.2em;
+            text-transform: uppercase;
+            color: var(--text-faint);
+            animation: hint-breathe 3s ease-in-out infinite;
+        }
+        @keyframes hint-breathe {
+            0%,
+            100% {
+                opacity: 0.35;
+            }
+            50% {
+                opacity: 0.8;
+            }
+        }
+
+        #bottom-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            pointer-events: none;
+        }
+        #bottom-bar .chapter-label {
+            font-family: var(--font-mono);
+            font-size: 0.62rem;
+            letter-spacing: 0.3em;
+            text-transform: uppercase;
+            color: var(--text-faint);
+            transition: color 0.6s;
+        }
+        #bottom-bar .chapter-label.active {
+            color: var(--accent);
+        }
+        #bottom-bar .scroll-progress {
+            font-family: var(--font-mono);
+            font-size: 0.62rem;
+            letter-spacing: 0.2em;
+            color: var(--text-faint);
+        }
+
+        #center-text {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 5;
+            pointer-events: none;
+            text-align: center;
+            opacity: 0;
+            transition: opacity 0.8s cubic-bezier(0.22, 1, 0.36, 1);
+        }
+        #center-text.visible {
+            opacity: 1;
+        }
+        #center-text .title {
+            font-size: clamp(2.5rem, 8vw, 6rem);
+            font-weight: 600;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--text);
+            margin-bottom: 0.5rem;
+            text-shadow: 0 0 60px rgba(200, 190, 175, 0.15);
+        }
+        #center-text .tagline {
+            font-family: var(--font-mono);
+            font-size: 0.65rem;
+            letter-spacing: 0.35em;
+            text-transform: uppercase;
+            color: var(--text-dim);
+        }
+
+        #ui-panel {
+            position: fixed;
+            bottom: 2rem;
+            right: 2.5rem;
+            z-index: 6;
+            pointer-events: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            opacity: 0;
+            transition: opacity 1s cubic-bezier(0.22, 1, 0.36, 1);
+        }
+        #ui-panel.visible {
+            opacity: 1;
+        }
+
+        .ui-group {
+            background: var(--ui-bg);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--border);
+            border-radius: var(--ui-radius);
+            padding: 0.6rem 0.7rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.4rem;
+            min-width: 160px;
+            transition: background var(--transition), border-color var(--transition);
+        }
+        .ui-group:hover {
+            background: var(--ui-hover);
+            border-color: rgba(200, 190, 175, 0.2);
+        }
+        .ui-label {
+            font-family: var(--font-mono);
+            font-size: 0.55rem;
+            letter-spacing: 0.25em;
+            text-transform: uppercase;
+            color: var(--text-faint);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .ui-label .value-display {
+            color: var(--accent);
+            font-size: 0.55rem;
+        }
+
+        .material-btn-row {
+            display: flex;
+            gap: 0.25rem;
+            flex-wrap: wrap;
+        }
+        .material-btn {
+            background: transparent;
+            border: 1px solid var(--border);
+            border-radius: 3px;
+            color: var(--text-dim);
+            font-family: var(--font-mono);
+            font-size: 0.55rem;
+            letter-spacing: 0.08em;
+            padding: 0.3rem 0.5rem;
+            cursor: pointer;
+            transition: all var(--transition);
+            text-transform: uppercase;
+            white-space: nowrap;
+        }
+        .material-btn:hover {
+            border-color: rgba(200, 190, 175, 0.35);
+            color: var(--text);
+            background: rgba(255, 255, 255, 0.03);
+        }
+        .material-btn.active {
+            border-color: var(--accent);
+            color: var(--accent);
+            background: rgba(200, 190, 175, 0.08);
+        }
+
+        .slider-row {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .slider-row input[type='range'] {
+            -webkit-appearance: none;
+            flex: 1;
+            height: 2px;
+            background: rgba(255, 255, 255, 0.15);
+            border-radius: 1px;
+            outline: none;
+            cursor: pointer;
+        }
+        .slider-row input[type='range']::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: var(--accent);
+            border: none;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        .slider-row input[type='range']::-webkit-slider-thumb:hover {
+            transform: scale(1.3);
+        }
+        .slider-row input[type='range']::-moz-range-thumb {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: var(--accent);
+            border: none;
+            cursor: pointer;
+        }
+
+        @media (max-width: 768px) {
+            #main-overlay {
+                padding: 1.25rem 1.25rem;
+            }
+            #ui-panel {
+                bottom: 1rem;
+                right: 1rem;
+                left: 1rem;
+                flex-direction: row;
+                flex-wrap: wrap;
+                justify-content: flex-end;
+            }
+            .ui-group {
+                min-width: 120px;
+                padding: 0.4rem 0.5rem;
+            }
+            .material-btn {
+                font-size: 0.5rem;
+                padding: 0.25rem 0.4rem;
+            }
+            #center-text .title {
+                font-size: clamp(1.8rem, 6vw, 3.5rem);
+            }
+            #center-text .tagline {
+                font-size: 0.55rem;
+                letter-spacing: 0.25em;
+            }
+        }
+        @media (max-width: 420px) {
+            #ui-panel {
+                flex-direction: column;
+                align-items: flex-end;
+                gap: 0.35rem;
+            }
+            .ui-group {
+                min-width: 140px;
+            }
+            #top-bar .scroll-hint {
+                display: none;
+            }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            * {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+            }
+            #grain-overlay {
+                animation: none;
+            }
+            .progress-fill {
+                transition: none;
+            }
+        }
+    </style>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+</head>
+<body>
+
+    <div id="canvas-container"></div>
+    <div id="vignette-overlay"></div>
+    <div id="grain-overlay"></div>
+
+    <div id="scroll-container">
+        <div id="scroll-spacer"></div>
+    </div>
+
+    <div id="loading-screen">
+        <div class="logo-text">NOVA</div>
+        <div class="sub-text">Initializing Material System</div>
+        <div class="progress-track">
+            <div class="progress-fill" id="progress-fill"></div>
+        </div>
+        <div class="progress-num" id="progress-num">00</div>
+    </div>
+
+    <div id="main-overlay">
+        <div id="top-bar">
+            <div class="brand">NOVA <span>/</span> Material Lab</div>
+            <div class="scroll-hint">Scroll to Explore</div>
+        </div>
+        <div id="bottom-bar">
+            <div class="chapter-label" id="chapter-label">Awakening</div>
+            <div class="scroll-progress" id="scroll-progress">000</div>
+        </div>
+    </div>
+
+    <div id="center-text">
+        <div class="title">NOVA</div>
+        <div class="tagline">Material Beyond Imagination</div>
+    </div>
+
+    <div id="ui-panel">
+        <div class="ui-group">
+            <div class="ui-label">Material <span class="value-display" id="mat-display">Chrome</span></div>
+            <div class="material-btn-row" id="material-btns">
+                <button class="material-btn active" data-mat="chrome">Chrome</button>
+                <button class="material-btn" data-mat="liquid">Liquid</button>
+                <button class="material-btn" data-mat="glass">Glass</button>
+                <button class="material-btn" data-mat="crystal">Crystal</button>
+                <button class="material-btn" data-mat="carbon">Carbon</button>
+                <button class="material-btn" data-mat="ceramic">Ceramic</button>
+            </div>
+        </div>
+        <div class="ui-group">
+            <div class="ui-label">Intensity <span class="value-display" id="light-display">1.00</span></div>
+            <div class="slider-row">
+                <input type="range" id="light-slider" min="0.2" max="2.5" step="0.01" value="1">
+            </div>
+        </div>
+        <div class="ui-group">
+            <div class="ui-label">Rim <span class="value-display" id="rim-display">0.80</span></div>
+            <div class="slider-row">
+                <input type="range" id="rim-slider" min="0" max="2" step="0.01" value="0.8">
+            </div>
+        </div>
+    </div>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+        import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+        import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+        import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
+        import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+
+        // ==================== CONFIGURATION ====================
+        const CONFIG = {
+            scrollHeight: 600,
+            cameraDamping: 0.08,
+            mouseParallaxStrength: 0.35,
+            particleCount: window.innerWidth < 768 ? 800 : 2200,
+            bloomStrength: 0.55,
+            bloomRadius: 0.4,
+            bloomThreshold: 0.15,
+            reducedMotion: false,
+            isMobile: window.innerWidth < 768,
+            isTouch: 'ontouchstart' in window,
+            dpr: Math.min(window.devicePixelRatio || 1, 2),
+        };
+
+        if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+            CONFIG.reducedMotion = true;
+            CONFIG.cameraDamping = 0.2;
+        }
+        if (CONFIG.isMobile) {
+            CONFIG.particleCount = 800;
+            CONFIG.dpr = Math.min(CONFIG.dpr, 1.5);
+        }
+
+        // ==================== DOM ELEMENTS ====================
+        const container = document.getElementById('canvas-container');
+        const scrollContainer = document.getElementById('scroll-container');
+        const loadingScreen = document.getElementById('loading-screen');
+        const progressFill = document.getElementById('progress-fill');
+        const progressNum = document.getElementById('progress-num');
+        const mainOverlay = document.getElementById('main-overlay');
+        const centerText = document.getElementById('center-text');
+        const chapterLabel = document.getElementById('chapter-label');
+        const scrollProgressEl = document.getElementById('scroll-progress');
+        const uiPanel = document.getElementById('ui-panel');
+        const matDisplay = document.getElementById('mat-display');
+        const lightDisplay = document.getElementById('light-display');
+        const rimDisplay = document.getElementById('rim-display');
+        const lightSlider = document.getElementById('light-slider');
+        const rimSlider = document.getElementById('rim-slider');
+        const materialBtns = document.getElementById('material-btns');
+
+        // ==================== STATE ====================
+        const state = {
+            scrollProgress: 0,
+            targetScroll: 0,
+            smoothScroll: 0,
+            mouseX: 0,
+            mouseY: 0,
+            targetMouseX: 0,
+            targetMouseY: 0,
+            currentMaterial: 'chrome',
+            lightIntensity: 1.0,
+            rimIntensity: 0.8,
+            deconstructProgress: 0,
+            previousDeconstruct: 0,
+            isInitialized: false,
+            loadProgress: 0,
+            cameraTarget: new THREE.Vector3(0, 0, 0),
+            reducedMotion: CONFIG.reducedMotion,
+            centerTextVisible: true,
+        };
+
+        // ==================== SCENE SETUP ====================
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x050505);
+        scene.fog = new THREE.FogExp2(0x050505, 0.12);
+
+        const camera = new THREE.PerspectiveCamera(
+            40,
+            window.innerWidth / window.innerHeight,
+            0.05,
+            80
+        );
+        camera.position.set(0, 0.5, 10);
+        camera.lookAt(0, 0, 0);
+
+        const renderer = new THREE.WebGLRenderer({
+            antialias: true,
+            alpha: true,
+            powerPreference: 'high-performance',
+            stencil: false,
+            depth: true,
+        });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(CONFIG.dpr);
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 1.0;
+        renderer.outputColorSpace = THREE.SRGBColorSpace;
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        renderer.setClearColor(0x050505, 1);
+        container.appendChild(renderer.domElement);
+
+        // ==================== ENVIRONMENT ====================
+        const pmremGenerator = new THREE.PMREMGenerator(renderer);
+        pmremGenerator.compileEquirectangularShader();
+        let envMap = null;
+        try {
+            const roomEnv = new RoomEnvironment();
+            envMap = pmremGenerator.fromScene(roomEnv, 0.04).texture;
+            scene.environment = envMap;
+            scene.environmentIntensity = 0.6;
+            roomEnv.dispose();
+        } catch (e) {
+            console.warn('Environment generation failed, using basic lighting');
+        }
+
+        // ==================== OBJECT CONSTRUCTION ====================
+        const novaGroup = new THREE.Group();
+        novaGroup.position.set(0, 0, 0);
+        scene.add(novaGroup);
+
+        // Energy core
+        const coreGeo = new THREE.IcosahedronGeometry(0.28, 3);
+        const coreMaterial = new THREE.MeshStandardMaterial({
+            color: 0xfff5e6,
+            emissive: 0xffe0b0,
+            emissiveIntensity: 2.5,
+            roughness: 0.15,
+            metalness: 0.1,
+        });
+        const energyCore = new THREE.Mesh(coreGeo, coreMaterial);
+        energyCore.castShadow = true;
+        novaGroup.add(energyCore);
+
+        // Inner wireframe icosahedron
+        const wireGeo = new THREE.IcosahedronGeometry(1.15, 1);
+        const wireMat = new THREE.MeshBasicMaterial({
+            color: 0x7a6a50,
+            wireframe: true,
+            transparent: true,
+            opacity: 0.35,
+            depthWrite: false,
+        });
+        const wireframeMesh = new THREE.Mesh(wireGeo, wireMat);
+        novaGroup.add(wireframeMesh);
+
+        // Main torus knot body
+        const knotGeo = new THREE.TorusKnotGeometry(0.9, 0.22, 220, 36, 3, 4);
+        const knotMaterial = new THREE.MeshStandardMaterial({
+            color: 0xc0b8aa,
+            roughness: 0.12,
+            metalness: 0.95,
+            envMapIntensity: 1.8,
+        });
+        const mainKnot = new THREE.Mesh(knotGeo, knotMaterial);
+        mainKnot.castShadow = true;
+        mainKnot.receiveShadow = true;
+        novaGroup.add(mainKnot);
+
+        // Orbital rings
+        const ringGroup = new THREE.Group();
+        novaGroup.add(ringGroup);
+        const ringConfigs = [
+            { radius: 1.6, tube: 0.035, rot: [0, 0, 0], axis: 'x' },
+            { radius: 1.75, tube: 0.025, rot: [Math.PI / 2, 0, 0], axis: 'y' },
+            { radius: 1.45, tube: 0.03, rot: [0, Math.PI / 2, 0], axis: 'z' },
+            { radius: 1.9, tube: 0.02, rot: [Math.PI / 3, Math.PI / 4, 0], axis: 'diag' },
+        ];
+        const ringMeshes = [];
+        ringConfigs.forEach((cfg) => {
+            const geo = new THREE.TorusGeometry(cfg.radius, cfg.tube, 24, 120);
+            const mat = new THREE.MeshStandardMaterial({
+                color: 0x9a8a70,
+                roughness: 0.25,
+                metalness: 0.85,
+                envMapIntensity: 1.5,
+                transparent: true,
+                opacity: 0.7,
+            });
+            const mesh = new THREE.Mesh(geo, mat);
+            mesh.rotation.set(...cfg.rot);
+            mesh.castShadow = true;
+            ringGroup.add(mesh);
+            ringMeshes.push({ mesh, baseRadius: cfg.radius, baseRot: cfg.rot, axis: cfg.axis });
+        });
+
+        // Shell panels
+        const panelGroup = new THREE.Group();
+        novaGroup.add(panelGroup);
+        const panelMeshes = [];
+        const panelCount = 14;
+        for (let i = 0; i < panelCount; i++) {
+            const angle = (i / panelCount) * Math.PI * 2;
+            const height = (Math.sin(i * 2.5) * 0.4);
+            const radius = 1.25 + Math.cos(i * 3.7) * 0.15;
+            const geo = new THREE.CylinderGeometry(0.08, 0.12, 0.16, 6);
+            const mat = new THREE.MeshStandardMaterial({
+                color: 0xb0a590,
+                roughness: 0.3,
+                metalness: 0.7,
+                envMapIntensity: 1.3,
+            });
+            const mesh = new THREE.Mesh(geo, mat);
+            mesh.position.set(
+                Math.cos(angle) * radius,
+                height,
+                Math.sin(angle) * radius
+            );
+            mesh.rotation.set(angle, Math.cos(angle * 2) * 0.4, Math.sin(angle * 3) * 0.3);
+            mesh.castShadow = true;
+            panelGroup.add(mesh);
+            panelMeshes.push({
+                mesh,
+                origPos: mesh.position.clone(),
+                origRot: mesh.rotation.clone(),
+                explodeDir: new THREE.Vector3(
+                    Math.cos(angle) * radius * 1.6,
+                    height * 2 + 0.3,
+                    Math.sin(angle) * radius * 1.6
+                ).normalize(),
+            });
+        }
+
+        // Small surface details
+        const detailGroup = new THREE.Group();
+        novaGroup.add(detailGroup);
+        const detailCount = 30;
+        const detailMeshes = [];
+        for (let i = 0; i < detailCount; i++) {
+            const phi = Math.acos(2 * Math.random() - 1);
+            const theta = Math.random() * Math.PI * 2;
+            const r = 0.95 + Math.random() * 0.2;
+            const geo = new THREE.OctahedronGeometry(0.06 + Math.random() * 0.08, 1);
+            const mat = new THREE.MeshStandardMaterial({
+                color: 0x8a7a60,
+                roughness: 0.4,
+                metalness: 0.6,
+                envMapIntensity: 1.2,
+                transparent: true,
+                opacity: 0.6,
+            });
+            const mesh = new THREE.Mesh(geo, mat);
+            mesh.position.set(
+                r * Math.sin(phi) * Math.cos(theta),
+                r * Math.cos(phi),
+                r * Math.sin(phi) * Math.sin(theta)
+            );
+            mesh.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, 0);
+            detailGroup.add(mesh);
+            detailMeshes.push({
+                mesh,
+                origPos: mesh.position.clone(),
+                origRot: mesh.rotation.clone(),
+                explodeDir: mesh.position.clone().normalize(),
+            });
+        }
+
+        // ==================== MATERIAL SYSTEM ====================
+        const materialPresets = {
+            chrome: {
+                color: 0xd8d5d0,
+                roughness: 0.06,
+                metalness: 1.0,
+                envMapIntensity: 2.2,
+                clearcoat: 0,
+                transmission: 0,
+                ior: 1.5,
+                thickness: 0,
+                emissive: 0x000000,
+                emissiveIntensity: 0,
+                opacity: 1,
+                transparent: false,
+                wireframe: false,
+            },
+            liquid: {
+                color: 0x9a9a9a,
+                roughness: 0.08,
+                metalness: 0.95,
+                envMapIntensity: 2.0,
+                clearcoat: 0.3,
+                transmission: 0,
+                ior: 1.5,
+                thickness: 0,
+                emissive: 0x000000,
+                emissiveIntensity: 0,
+                opacity: 1,
+                transparent: false,
+                wireframe: false,
+            },
+            glass: {
+                color: 0xeeeeee,
+                roughness: 0.02,
+                metalness: 0.05,
+                envMapIntensity: 1.0,
+                clearcoat: 1.0,
+                transmission: 0.92,
+                ior: 1.52,
+                thickness: 0.6,
+                emissive: 0x000000,
+                emissiveIntensity: 0,
+                opacity: 0.85,
+                transparent: true,
+                wireframe: false,
+            },
+            crystal: {
+                color: 0xe0e8f0,
+                roughness: 0.04,
+                metalness: 0.02,
+                envMapIntensity: 1.5,
+                clearcoat: 0.8,
+                transmission: 0.7,
+                ior: 1.85,
+                thickness: 0.9,
+                emissive: 0x1a1a30,
+                emissiveIntensity: 0.5,
+                opacity: 0.9,
+                transparent: true,
+                wireframe: false,
+            },
+            carbon: {
+                color: 0x1a1a1a,
+                roughness: 0.55,
+                metalness: 0.35,
+                envMapIntensity: 0.6,
+                clearcoat: 0.1,
+                transmission: 0,
+                ior: 1.5,
+                thickness: 0,
+                emissive: 0x000000,
+                emissiveIntensity: 0,
+                opacity: 1,
+                transparent: false,
+                wireframe: false,
+            },
+            ceramic: {
+                color: 0xe8e4dc,
+                roughness: 0.28,
+                metalness: 0.02,
+                envMapIntensity: 0.7,
+                clearcoat: 0.15,
+                transmission: 0,
+                ior: 1.5,
+                thickness: 0,
+                emissive: 0x000000,
+                emissiveIntensity: 0,
+                opacity: 1,
+                transparent: false,
+                wireframe: false,
+            },
+        };
+
+        function applyMaterial(matName) {
+            const preset = materialPresets[matName];
+            if (!preset) return;
+            state.currentMaterial = matName;
+            matDisplay.textContent = preset.displayName || matName.charAt(0).toUpperCase() + matName.slice(1);
+
+            const allTargets = [mainKnot, energyCore, ...ringMeshes.map(r => r.mesh), ...panelMeshes.map(p => p.mesh), ...detailMeshes
+                .map(d => d.mesh)];
+            allTargets.forEach((mesh) => {
+                if (mesh.material && mesh.material.isMeshStandardMaterial) {
+                    mesh.material.color.setHex(preset.color);
+                    mesh.material.roughness = preset.roughness;
+                    mesh.material.metalness = preset.metalness;
+                    mesh.material.envMapIntensity = preset.envMapIntensity;
+                    if (mesh.material.clearcoat !== undefined) mesh.material.clearcoat = preset.clearcoat;
+                    mesh.material.transparent = preset.transparent;
+                    mesh.material.opacity = preset.opacity;
+                    if (mesh.material.transmission !== undefined) {
+                        mesh.material.transmission = preset.transmission;
+                        mesh.material.ior = preset.ior;
+                        mesh.material.thickness = preset.thickness;
+                    }
+                    if (mesh.material.emissive) mesh.material.emissive.setHex(preset.emissive);
+                    if (mesh.material.emissiveIntensity !== undefined) mesh.material.emissiveIntensity = preset
+                        .emissiveIntensity;
+                    mesh.material.needsUpdate = true;
+                }
+            });
+
+            // Energy core gets special treatment
+            if (matName === 'glass' || matName === 'crystal') {
+                energyCore.material.emissiveIntensity = 1.5;
+                energyCore.material.emissive.setHex(0xffe0b0);
+            } else {
+                energyCore.material.emissiveIntensity = 2.5;
+                energyCore.material.emissive.setHex(0xffe0b0);
+            }
+
+            // Update material button states
+            document.querySelectorAll('.material-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.mat === matName);
+            });
+        }
+
+        // Pre-populate display names
+        Object.keys(materialPresets).forEach(key => {
+            materialPresets[key].displayName = key === 'liquid' ? 'Liquid Metal' :
+                key.charAt(0).toUpperCase() + key.slice(1);
+        });
+
+        // ==================== PARTICLE SYSTEM ====================
+        const particleCount = CONFIG.particleCount;
+        const particleGeo = new THREE.BufferGeometry();
+        const positions = new Float32Array(particleCount * 3);
+        const velocities = new Float32Array(particleCount * 3);
+        const basePositions = new Float32Array(particleCount * 3);
+        const sizes = new Float32Array(particleCount);
+        const particlePhases = new Float32Array(particleCount);
+
+        for (let i = 0; i < particleCount; i++) {
+            const radius = 0.4 + Math.random() * 3.5;
+            const phi = Math.acos(2 * Math.random() - 1);
+            const theta = Math.random() * Math.PI * 2;
+            const px = radius * Math.sin(phi) * Math.cos(theta);
+            const py = radius * Math.cos(phi) * 0.7;
+            const pz = radius * Math.sin(phi) * Math.sin(theta);
+            positions[i * 3] = px;
+            positions[i * 3 + 1] = py;
+            positions[i * 3 + 2] = pz;
+            basePositions[i * 3] = px;
+            basePositions[i * 3 + 1] = py;
+            basePositions[i * 3 + 2] = pz;
+            velocities[i * 3] = (Math.random() - 0.5) * 0.03;
+            velocities[i * 3 + 1] = (Math.random() - 0.5) * 0.02;
+            velocities[i * 3 + 2] = (Math.random() - 0.5) * 0.03;
+            sizes[i] = 0.008 + Math.random() * 0.025;
+            particlePhases[i] = Math.random() * Math.PI * 2;
+        }
+
+        particleGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        particleGeo.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
+        particleGeo.setAttribute('phase', new THREE.BufferAttribute(particlePhases, 1));
+
+        const particleVertShader = `
+            attribute float size;
+            attribute float phase;
+            uniform float uTime;
+            uniform float uExplode;
+            uniform float uSwarm;
+            varying float vAlpha;
+            varying float vPhase;
+            void main() {
+                vPhase = phase;
+                vec3 pos = position;
+                float t = uTime + phase;
+                float dist = length(pos);
+                float wave = sin(t * 2.0 + dist * 3.0) * 0.04;
+                float vortex = sin(t * 1.5 + atan(pos.z, pos.x) * 3.0) * 0.08;
+                pos.y += wave;
+                pos.x += vortex * cos(phase);
+                pos.z += vortex * sin(phase);
+                if (uExplode > 0.01) {
+                    vec3 dir = normalize(pos + 0.001);
+                    float explodeForce = uExplode * (0.5 + sin(phase * 3.0) * 0.5);
+                    pos += dir * explodeForce * 2.5;
+                }
+                if (uSwarm > 0.01) {
+                    pos += normalize(pos) * sin(t * 1.8 + phase * 2.0) * uSwarm * 0.6;
+                }
+                vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
+                gl_PointSize = size * (300.0 / -mvPosition.z);
+                gl_PointSize = clamp(gl_PointSize, 1.0, 40.0);
+                gl_Position = projectionMatrix * mvPosition;
+                vAlpha = 0.5 + 0.5 * sin(t * 1.5 + phase);
+                vAlpha *= (1.0 - uExplode * 0.5);
+            }
+        `;
+        const particleFragShader = `
+            uniform vec3 uColor;
+            uniform float uOpacity;
+            varying float vAlpha;
+            varying float vPhase;
+            void main() {
+                float d = length(gl_PointCoord - vec2(0.5));
+                if (d > 0.5) discard;
+                float alpha = smoothstep(0.5, 0.05, d) * vAlpha * uOpacity;
+                vec3 col = uColor;
+                float core = smoothstep(0.3, 0.05, d);
+                col += vec3(0.15, 0.1, 0.05) * core;
+                gl_FragColor = vec4(col, alpha);
+            }
+        `;
+
+        const particleMaterial = new THREE.ShaderMaterial({
+            vertexShader: particleVertShader,
+            fragmentShader: particleFragShader,
+            uniforms: {
+                uTime: { value: 0 },
+                uExplode: { value: 0 },
+                uSwarm: { value: 0 },
+                uColor: { value: new THREE.Color(0xc9b8a0) },
+                uOpacity: { value: 0.5 },
+            },
+            transparent: true,
+            depthWrite: false,
+            blending: THREE.AdditiveBlending,
+        });
+
+        const particles = new THREE.Points(particleGeo, particleMaterial);
+        novaGroup.add(particles);
+
+        // ==================== LIGHTING ====================
+        const ambientLight = new THREE.AmbientLight(0x1a1a1a, 0.8);
+        scene.add(ambientLight);
+
+        const mainLight = new THREE.DirectionalLight(0xfff0e0, 2.5);
+        mainLight.position.set(5, 6, 4);
+        mainLight.castShadow = true;
+        mainLight.shadow.mapSize.width = 1024;
+        mainLight.shadow.mapSize.height = 1024;
+        mainLight.shadow.camera.near = 0.5;
+        mainLight.shadow.camera.far = 30;
+        mainLight.shadow.camera.left = -8;
+        mainLight.shadow.camera.right = 8;
+        mainLight.shadow.camera.top = 8;
+        mainLight.shadow.camera.bottom = -8;
+        mainLight.shadow.bias = -0.0001;
+        mainLight.shadow.normalBias = 0.02;
+        scene.add(mainLight);
+
+        const rimLight = new THREE.DirectionalLight(0x8899bb, 1.5);
+        rimLight.position.set(-3, -1, -5);
+        scene.add(rimLight);
+
+        const fillLight = new THREE.DirectionalLight(0x445566, 0.6);
+        fillLight.position.set(0, -2, 3);
+        scene.add(fillLight);
+
+        const rimLightFront = new THREE.DirectionalLight(0xaabbcc, 0.8);
+        rimLightFront.position.set(0, 3, -4);
+        scene.add(rimLightFront);
+
+        // ==================== POST-PROCESSING ====================
+        const composer = new EffectComposer(renderer);
+        const renderPass = new RenderPass(scene, camera);
+        composer.addPass(renderPass);
+
+        const bloomPass = new UnrealBloomPass(
+            new THREE.Vector2(window.innerWidth, window.innerHeight),
+            CONFIG.bloomStrength,
+            CONFIG.bloomRadius,
+            CONFIG.bloomThreshold
+        );
+        composer.addPass(bloomPass);
+
+        const vignetteShader = {
+            uniforms: {
+                tDiffuse: { value: null },
+                uDarkness: { value: 0.35 },
+                uGrain: { value: 0.025 },
+                uTime: { value: 0 },
+            },
+            vertexShader: `
+                varying vec2 vUv;
+                void main() {
+                    vUv = uv;
+                    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                }
+            `,
+            fragmentShader: `
+                uniform sampler2D tDiffuse;
+                uniform float uDarkness;
+                uniform float uGrain;
+                uniform float uTime;
+                varying vec2 vUv;
+                float hash(vec2 p) {
+                    return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
+                }
+                void main() {
+                    vec4 color = texture2D(tDiffuse, vUv);
+                    float dist = distance(vUv, vec2(0.5));
+                    float vignette = smoothstep(0.75, 0.25, dist) * uDarkness;
+                    color.rgb *= (1.0 - vignette);
+                    float grain = (hash(vUv + uTime * 0.001) - 0.5) * uGrain;
+                    color.rgb += grain;
+                    gl_FragColor = color;
+                }
+            `,
+        };
+        const vignettePass = new ShaderPass(vignetteShader);
+        composer.addPass(vignettePass);
+
+        // ==================== SCROLL SYSTEM ====================
+        const scrollSpacer = document.getElementById('scroll-spacer');
+        scrollSpacer.style.height = CONFIG.scrollHeight + 'vh';
+
+        scrollContainer.addEventListener('scroll', () => {
+            const maxScroll = scrollContainer.scrollHeight - scrollContainer.clientHeight;
+            state.targetScroll = maxScroll > 0 ? scrollContainer.scrollTop / maxScroll : 0;
+        }, { passive: true });
+
+        // Touch swipe handling
+        let touchStartY = 0;
+        let touchDelta = 0;
+        scrollContainer.addEventListener('touchstart', (e) => {
+            touchStartY = e.touches[0].clientY;
+        }, { passive: true });
+        scrollContainer.addEventListener('touchmove', (e) => {
+            touchDelta = e.touches[0].clientY - touchStartY;
+        }, { passive: true });
+
+        // ==================== MOUSE INTERACTION ====================
+        window.addEventListener('mousemove', (e) => {
+            state.targetMouseX = (e.clientX / window.innerWidth) * 2 - 1;
+            state.targetMouseY = -(e.clientY / window.innerHeight) * 2 + 1;
+        });
+
+        window.addEventListener('touchmove', (e) => {
+            if (e.touches.length > 0) {
+                state.targetMouseX = (e.touches[0].clientX / window.innerWidth) * 2 - 1;
+                state.targetMouseY = -(e.touches[0].clientY / window.innerHeight) * 2 + 1;
+            }
+        }, { passive: true });
+
+        // ==================== CAMERA PATH ====================
+        const cameraKeyframes = [
+            { pos: [0, 0.4, 11], look: [0, 0, 0], t: 0.0, desc: 'Awakening' },
+            { pos: [3.5, 1.2, 8.5], look: [0, 0, 0], t: 0.1, desc: 'Approach' },
+            { pos: [2.8, 0.6, 6.0], look: [0, 0, 0], t: 0.2, desc: 'Reveal' },
+            { pos: [1.8, 0.3, 4.2], look: [0, 0, 0], t: 0.3, desc: 'Surface' },
+            { pos: [1.2, 0.15, 2.8], look: [0, 0, 0], t: 0.4, desc: 'Close-Up' },
+            { pos: [0.5, 0.05, 1.5], look: [0, 0, 0], t: 0.52, desc: 'Entry' },
+            { pos: [0.2, 0.0, 0.6], look: [0, 0, 0], t: 0.62, desc: 'Interior' },
+            { pos: [0.1, 0.0, 0.2], look: [0, 0, 0], t: 0.7, desc: 'Core' },
+            { pos: [1.8, 0.8, 3.5], look: [0, 0, 0], t: 0.8, desc: 'Deconstruct' },
+            { pos: [3.2, 1.5, 5.5], look: [0, 0, 0], t: 0.88, desc: 'Exploded' },
+            { pos: [2.0, 0.5, 6.5], look: [0, 0, 0], t: 0.95, desc: 'Reconstruct' },
+            { pos: [0, 0.8, 9.0], look: [0, 0, 0], t: 1.0, desc: 'Final' },
+        ];
+
+        function lerp(a, b, t) { return a + (b - a) * t; }
+
+        function smoothstep(t) { return t * t * (3 - 2 * t); }
+
+        function getCameraPose(progress) {
+            const clamped = Math.max(0, Math.min(1, progress));
+            let prev = cameraKeyframes[0];
+            let next = cameraKeyframes[cameraKeyframes.length - 1];
+            for (let i = 0; i < cameraKeyframes.length - 1; i++) {
+                if (clamped >= cameraKeyframes[i].t && clamped <= cameraKeyframes[i + 1].t) {
+                    prev = cameraKeyframes[i];
+                    next = cameraKeyframes[i + 1];
+                    break;
+                }
+            }
+            const range = next.t - prev.t;
+            const localT = range > 0 ? (clamped - prev.t) / range : 0;
+            const smoothT = smoothstep(localT);
+            const pos = [
+                lerp(prev.pos[0], next.pos[0], smoothT),
+                lerp(prev.pos[1], next.pos[1], smoothT),
+                lerp(prev.pos[2], next.pos[2], smoothT),
+            ];
+            const look = [
+                lerp(prev.look[0], next.look[0], smoothT),
+                lerp(prev.look[1], next.look[1], smoothT),
+                lerp(prev.look[2], next.look[2], smoothT),
+            ];
+            return { pos, look, desc: next.desc };
+        }
+
+        // ==================== DECONSTRUCTION ====================
+        function updateDeconstruction(progress) {
+            let deconstruct = 0;
+            if (progress > 0.72 && progress < 0.86) {
+                deconstruct = smoothstep((progress - 0.72) / 0.14);
+            } else if (progress >= 0.86 && progress < 0.9) {
+                deconstruct = 1.0;
+            } else if (progress >= 0.9 && progress < 1.0) {
+                deconstruct = 1.0 - smoothstep((progress - 0.9) / 0.1);
+            } else if (progress >= 1.0) {
+                deconstruct = 0;
+            }
+            state.deconstructProgress = deconstruct;
+
+            panelMeshes.forEach((panel, i) => {
+                const dir = panel.explodeDir;
+                const dist = deconstruct * (1.2 + Math.sin(i * 2.1) * 0.4);
+                panel.mesh.position.set(
+                    panel.origPos.x + dir.x * dist,
+                    panel.origPos.y + dir.y * dist,
+                    panel.origPos.z + dir.z * dist
+                );
+                panel.mesh.rotation.x = panel.origRot.x + deconstruct * (Math.sin(i * 1.7) * 2.0);
+                panel.mesh.rotation.y = panel.origRot.y + deconstruct * (Math.cos(i * 2.3) * 1.8);
+                panel.mesh.rotation.z = panel.origRot.z + deconstruct * (Math.sin(i * 1.1) * 1.5);
+            });
+
+            detailMeshes.forEach((det, i) => {
+                const dir = det.explodeDir;
+                const dist = deconstruct * (0.8 + Math.sin(i * 3.7) * 0.5);
+                det.mesh.position.set(
+                    det.origPos.x + dir.x * dist,
+                    det.origPos.y + dir.y * dist,
+                    det.origPos.z + dir.z * dist
+                );
+                det.mesh.rotation.x = det.origRot.x + deconstruct * 2.5;
+                det.mesh.rotation.y = det.origRot.y + deconstruct * 3.0;
+            });
+
+            ringMeshes.forEach((ring, i) => {
+                const scale = 1 + deconstruct * (0.2 + i * 0.08);
+                ring.mesh.scale.setScalar(scale);
+                ring.mesh.rotation.z = ring.baseRot[0] + deconstruct * (0.3 + i * 0.15);
+                ring.mesh.rotation.x = ring.baseRot[1] + deconstruct * (0.2 + i * 0.1);
+            });
+
+            mainKnot.scale.setScalar(1 + deconstruct * 0.08);
+            wireframeMesh.scale.setScalar(1 + deconstruct * 0.2);
+            wireframeMesh.material.opacity = 0.35 - deconstruct * 0.2;
+
+            particleMaterial.uniforms.uExplode.value = deconstruct;
+
+            // Energy core reacts
+            energyCore.scale.setScalar(1 + deconstruct * 0.4);
+            energyCore.material.emissiveIntensity = 2.5 + deconstruct * 2.0;
+        }
+
+        // ==================== CHAPTER LABELS ====================
+        const chapters = [
+            { min: 0, max: 0.1, label: 'Awakening' },
+            { min: 0.1, max: 0.25, label: 'Reveal' },
+            { min: 0.25, max: 0.4, label: 'Surface' },
+            { min: 0.4, max: 0.55, label: 'Entry' },
+            { min: 0.55, max: 0.7, label: 'Interior' },
+            { min: 0.7, max: 0.8, label: 'Energy Core' },
+            { min: 0.8, max: 0.9, label: 'Deconstruction' },
+            { min: 0.9, max: 1.0, label: 'Reconstruction' },
+        ];
+
+        function updateChapter(progress) {
+            const active = chapters.find(c => progress >= c.min && progress < c.max);
+            if (active && chapterLabel.textContent !== active.label) {
+                chapterLabel.textContent = active.label;
+                chapterLabel.classList.add('active');
+            }
+        }
+
+        // ==================== UI WIRING ====================
+        materialBtns.addEventListener('click', (e) => {
+            const btn = e.target.closest('.material-btn');
+            if (!btn) return;
+            applyMaterial(btn.dataset.mat);
+        });
+
+        lightSlider.addEventListener('input', () => {
+            state.lightIntensity = parseFloat(lightSlider.value);
+            lightDisplay.textContent = state.lightIntensity.toFixed(2);
+            mainLight.intensity = 2.5 * state.lightIntensity;
+            fillLight.intensity = 0.6 * state.lightIntensity;
+        });
+
+        rimSlider.addEventListener('input', () => {
+            state.rimIntensity = parseFloat(rimSlider.value);
+            rimDisplay.textContent = state.rimIntensity.toFixed(2);
+            rimLight.intensity = 1.5 * state.rimIntensity;
+            rimLightFront.intensity = 0.8 * state.rimIntensity;
+        });
+
+        // ==================== LOADING MANAGEMENT ====================
+        let loadingDone = false;
+        let loadingTarget = 0;
+
+        function updateLoading(progress) {
+            const pct = Math.round(progress * 100);
+            progressFill.style.width = pct + '%';
+            progressNum.textContent = pct.toString().padStart(2, '0');
+            if (pct >= 100 && !loadingDone) {
+                loadingDone = true;
+                setTimeout(() => {
+                    loadingScreen.classList.add('hidden');
+                    mainOverlay.classList.add('visible');
+                    centerText.classList.add('visible');
+                    uiPanel.classList.add('visible');
+                    container.classList.add('interactive');
+                    state.isInitialized = true;
+                    setTimeout(() => {
+                        centerText.classList.remove('visible');
+                    }, 4000);
+                }, 400);
+            }
+        }
+
+        // ==================== ANIMATION LOOP ====================
+        const clock = new THREE.Clock();
+        const autoAdvanceTime = 8;
+        let autoAdvanceTimer = autoAdvanceTime;
+        let lastInteractionTime = Date.now();
+
+        function checkAutoAdvance(delta) {
+            if (Date.now() - lastInteractionTime > autoAdvanceTime * 1000 && state.scrollProgress < 0.05) {
+                autoAdvanceTimer -= delta;
+                if (autoAdvanceTimer <= 0) {
+                    state.targetScroll = Math.min(state.targetScroll + 0.002, 0.06);
+                    autoAdvanceTimer = 0.5;
+                }
+            } else {
+                autoAdvanceTimer = autoAdvanceTime;
+            }
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            const delta = clock.getDelta();
+            const elapsed = clock.getElapsedTime();
+
+            // Smooth scroll
+            state.smoothScroll = lerp(state.smoothScroll, state.targetScroll, CONFIG.cameraDamping);
+            if (Math.abs(state.smoothScroll - state.targetScroll) < 0.0001) state.smoothScroll = state.targetScroll;
+            state.scrollProgress = state.smoothScroll;
+
+            // Smooth mouse
+            state.mouseX = lerp(state.mouseX, state.targetMouseX, 0.06);
+            state.mouseY = lerp(state.mouseY, state.targetMouseY, 0.06);
+
+            checkAutoAdvance(delta);
+
+            // Camera
+            const pose = getCameraPose(state.scrollProgress);
+            const parallaxX = state.mouseX * CONFIG.mouseParallaxStrength;
+            const parallaxY = state.mouseY * CONFIG.mouseParallaxStrength * 0.6;
+            const targetCamPos = new THREE.Vector3(
+                pose.pos[0] + parallaxX,
+                pose.pos[1] + parallaxY,
+                pose.pos[2]
+            );
+            const lookTarget = new THREE.Vector3(pose.look[0], pose.look[1], pose.look[2]);
+            camera.position.lerp(targetCamPos, CONFIG.cameraDamping);
+            camera.lookAt(lookTarget);
+
+            // Object rotation
+            novaGroup.rotation.y = elapsed * 0.15;
+            novaGroup.rotation.x = Math.sin(elapsed * 0.2) * 0.08;
+            ringGroup.rotation.y = elapsed * 0.3;
+            ringGroup.rotation.z = Math.sin(elapsed * 0.4) * 0.1;
+
+            // Deconstruction
+            updateDeconstruction(state.scrollProgress);
+
+            // Particles
+            particleMaterial.uniforms.uTime.value = elapsed;
+            particleMaterial.uniforms.uSwarm.value = 0.2 + Math.sin(elapsed * 0.5) * 0.15;
+
+            // Lighting subtle animation
+            mainLight.position.x = 5 + Math.sin(elapsed * 0.3) * 1.5;
+            mainLight.position.y = 6 + Math.cos(elapsed * 0.4) * 1.0;
+            rimLight.position.x = -3 + Math.sin(elapsed * 0.25) * 2;
+
+            // Energy core pulse
+            const pulse = 1 + Math.sin(elapsed * 2.5) * 0.08;
+            energyCore.scale.setScalar(pulse * (1 + state.deconstructProgress * 0.4));
+            energyCore.material.emissiveIntensity = 2.5 + Math.sin(elapsed * 3.0) * 0.5;
+
+            // Post-processing
+            vignettePass.uniforms.uTime.value = elapsed * 100;
+            vignettePass.uniforms.uDarkness.value = 0.3 + Math.sin(elapsed * 0.3) * 0.05;
+
+            // UI updates
+            scrollProgressEl.textContent = Math.round(state.scrollProgress * 100).toString().padStart(3, '0');
+            updateChapter(state.scrollProgress);
+
+            // Render
+            composer.render();
+        }
+
+        // ==================== RESPONSIVE ====================
+        function onResize() {
+            const w = window.innerWidth;
+            const h = window.innerHeight;
+            camera.aspect = w / h;
+            camera.updateProjectionMatrix();
+            renderer.setSize(w, h);
+            composer.setSize(w, h);
+            bloomPass.resolution.set(w, h);
+        }
+        window.addEventListener('resize', onResize);
+        window.addEventListener('orientationchange', onResize);
+
+        // ==================== ACCESSIBILITY ====================
+        if (CONFIG.reducedMotion) {
+            particleMaterial.uniforms.uOpacity.value = 0.25;
+            bloomPass.strength = 0.2;
+            scene.fog.density = 0.06;
+        }
+
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'PageUp' || e.key === 'PageDown') {
+                lastInteractionTime = Date.now();
+            }
+            if (e.key >= '1' && e.key <= '6') {
+                const matKeys = Object.keys(materialPresets);
+                const idx = parseInt(e.key) - 1;
+                if (idx < matKeys.length) applyMaterial(matKeys[idx]);
+            }
+        });
+
+        scrollContainer.addEventListener('scroll', () => {
+            lastInteractionTime = Date.now();
+        }, { passive: true });
+        window.addEventListener('mousemove', () => {
+            lastInteractionTime = Date.now();
+        });
+
+        // ==================== WEBGL FALLBACK ====================
+        function checkWebGL() {
+            try {
+                const canvas = document.createElement('canvas');
+                return !!(window.WebGLRenderingContext && (canvas.getContext('webgl') || canvas.getContext(
+                    'webgl2')));
+            } catch (e) {
+                return false;
+            }
+        }
+
+        // ==================== INITIALIZATION ====================
+        async function init() {
+            if (!checkWebGL()) {
+                loadingScreen.innerHTML = `
+                    <div class="logo-text" style="font-size:1.5rem;">NOVA</div>
+                    <div class="sub-text" style="margin-top:1rem;">WebGL is required for this experience.</div>
+                    <div class="sub-text">Please enable hardware acceleration or use a modern browser.</div>
+                `;
+                return;
+            }
+
+            // Apply default material
+            applyMaterial('chrome');
+
+            // Simulate loading progress (shader compilation happens during first render)
+            let progress = 0;
+            const loadInterval = setInterval(() => {
+                progress += Math.random() * 8 + 3;
+                if (progress >= 100) {
+                    progress = 100;
+                    clearInterval(loadInterval);
+                }
+                updateLoading(progress / 100);
+            }, 120);
+
+            // Start animation
+            animate();
+
+            // Final loading completion (wait for shader compilation)
+            setTimeout(() => {
+                if (!loadingDone) {
+                    updateLoading(1.0);
+                    clearInterval(loadInterval);
+                }
+            }, 2800);
+        }
+
+        // Start
+        init();
+
+        // ==================== CLEANUP ON UNLOAD ====================
+        window.addEventListener('beforeunload', () => {
+            if (renderer) {
+                renderer.dispose();
+                pmremGenerator.dispose();
+                if (envMap) envMap.dispose();
+                scene.traverse((obj) => {
+                    if (obj.geometry) obj.geometry.dispose();
+                    if (obj.material) {
+                        if (obj.material.map) obj.material.map.dispose();
+                        obj.material.dispose();
+                    }
+                });
+            }
+        });
+
+        console.log(
+            '%c NOVA — The Material Lab ',
+            'background:#0a0a0a;color:#c9b8a0;font-size:1.2em;padding:8px 16px;border-radius:4px;font-weight:bold;'
+        );
+        console.log('%c A cinematic 3D material exploration experience. ', 'color:#8a8682;font-size:0.9em;');
+    </script>
+</body>
+</html>
